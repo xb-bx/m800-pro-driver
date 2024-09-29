@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include "buttons.h"
+#include "keys.h"
 #define M800_PRO_VID 0x248a
 #define M800_PRO_PID 0x5b2f
 #define INTERFACE 1
@@ -18,8 +20,11 @@ void
 usage() {
     printf("m800pro-drv <command> <args>\n");
     printf("commands:\n");
-    printf("\tquery (charge|poll)\n");
-    printf("\tset    poll (125|250|500|1000)\n");
+    printf("    list-keys                                   -   list keys\n");
+    printf("    list-buttons                                -   list buttons\n");
+    printf("    charge                                      -   query battery charge\n");
+    printf("    set         poll (125|250|500|1000)         -   set polling rate\n");
+    printf("    bind        <btn> <key>                     -   bind btn to key\n");
 }
 int
 query(int argc, char **argv, libusb_device_handle *dev_handle, int charge, int packet_id) {
@@ -43,6 +48,49 @@ set_polling_rate(libusb_device_handle *dev_handle, int packet_id, int polling_ra
     unsigned char payload[33] = {0xc, 0x1, 0x7, 0x0, 0x32, 0x1, 0x1, 0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     payload[4] = packet_id + 1;
     payload[7] = polling_rate;
+    int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
+    return n;
+}
+int
+find_button(char *name) {
+    for(int i = 0; i < BUTTONS_COUNT; i++) {
+        if(strcmp(buttons[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+int
+find_key(char *name) {
+    for(int i = 0; i < KEYS_COUNT; i++) {
+        if(strcmp(keys[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+int
+bind_key(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
+    if(argc < 2) {
+        usage(); 
+        return -1;
+    }
+    int btni = find_button(argv[0]);
+    if(btni == -1) {
+        eprintf("Unkown button\n");
+        return -1;
+    }
+    Button btn = buttons[btni];
+    int keyi = find_key(argv[1]);
+    if(keyi == -1) {
+        eprintf("Unkown key\n");
+        return -1;
+    }
+    Key key = keys[keyi];
+    unsigned char payload[33] = {0xc, 0x1, 0x4, 0x0, 0x27, 0x1, 0x4, 0x4, 0x50, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    payload[4] = packet_id+1;
+    payload[7] = btn.id;
+    memcpy(&payload[8], key.id, 3);
     int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
     return n;
 }
@@ -146,11 +194,27 @@ main(int argc, char **argv) {
         eprintf("ERROR: FAILED TO GET BATTERY CHARGE %i %s\n", charge, libusb_error_name(charge));
         return -1;
     }
-
-    if(strcmp("query", argv[1]) == 0) {
-        query(argc-2, argv+2, dev_handle, charge, id);
+    int res = 0;
+    if(strcmp("charge", argv[1]) == 0) {
+        printf("%i\n", charge);
     } else if(strcmp("set", argv[1]) == 0) {
-        set(argc-2, argv+2, dev_handle, id);
+        res = set(argc-2, argv+2, dev_handle, id);
+    } else if(strcmp("bind", argv[1]) == 0) {
+        res = bind_key(argc-2, argv+2, dev_handle, id);
+    } else if(strcmp("list-buttons", argv[1]) == 0) {
+        for(int i = 0; i < BUTTONS_COUNT; i++) {
+            Button btn = buttons[i];
+            printf("%s\n", btn.name); 
+        }
+    } else if(strcmp("list-keys", argv[1]) == 0) {
+        for(int i = 0; i < KEYS_COUNT; i++) {
+            Key key = keys[i];
+            printf("%s\n", key.name); 
+        }
+    }
+
+    if (res < 0) {
+        eprintf("ERROR: %i %s\n", res, libusb_error_name(res));
     }
 
     libusb_release_interface(dev_handle, INTERFACE);
@@ -161,4 +225,6 @@ main(int argc, char **argv) {
             return 1;
         }
     }
+    if(res < 0) return 1;
+    return 0;
 }
