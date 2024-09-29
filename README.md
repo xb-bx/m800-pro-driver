@@ -1,8 +1,8 @@
-# Linux driver for Delux M800 PRO mouse
+# Linux driver for Delux M800 PRO 3395 mouse
 # Capabilities
     - [X] Get battery charge
     - [X] set current polling rate
-    - [-] Remap keys
+    - [X] Remap keys
     - [ ] Set DPI
     - [ ] Set LOD height
     - [ ] Set Debounce time

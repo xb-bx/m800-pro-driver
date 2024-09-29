@@ -5,3 +5,7 @@ buttons.h: buttons.json gen-buttons.sh
 	./gen-buttons.sh
 keys.h: keys.json gen-keys.sh
 	./gen-keys.sh
+.PHONY: clean
+clean:
+	rm -r buttons.h keys.h m800pro-drv
+
