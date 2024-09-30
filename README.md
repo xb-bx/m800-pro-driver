@@ -4,6 +4,7 @@
     - [X] set current polling rate
     - [X] Remap keys
     - [ ] Set DPI
+    - [X] Set DPI colors
     - [X] Set LOD height
     - [X] Set Debounce time
     - [X] Set Powerdown time

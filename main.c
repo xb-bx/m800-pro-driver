@@ -27,6 +27,7 @@ usage() {
     printf("\tset\tpoll\t\t(125/250/500/1000)\n");
     printf("\tset\tpowerdown-time\t3-10\n");
     printf("\tset\tdebounce-time\t0-30\n");
+    printf("\tset\tdpi-colors\tff00ff 00ff00 ffffff ff0000 0000ff\n");
     printf("\tset\tLOD\t(1/2)\n");
     printf("\tbind\t<btn>\t<key>\t\n");
 }
@@ -79,6 +80,24 @@ set_LOD(libusb_device_handle *dev_handle, int packet_id, int lod) {
     int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
     return n;
 }
+void
+set_color(unsigned char *at, uint32_t color) {
+    at[0] = (color >> 16) & 0xFF;
+    at[1] = (color >>  8) & 0xFF;
+    at[2] = (color >>  0) & 0xFF;
+}
+int
+set_dpi_colors(libusb_device_handle *dev_handle, int packet_id, uint32_t colors[5]) {
+    unsigned char payload[33] = {0xc, 0x1, 0x6, 0x0, 0x2, 0x1, 0x18, 0x0, 0xff, 0x0, 0x0, 0xff, 0x0, 0x0, 0x0, 0xff, 0xff, 0x0, 0xff, 0xff, 0xff, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0, 0x0};
+    payload[4] = packet_id + 1;
+    set_color(&payload[7],  colors[0]);
+    set_color(&payload[10], colors[1]);
+    set_color(&payload[13], colors[2]);
+    set_color(&payload[16], colors[3]);
+    set_color(&payload[19], colors[4]);
+    int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
+    return n;
+}
 int
 find_button(char *name) {
     for(int i = 0; i < BUTTONS_COUNT; i++) {
@@ -121,6 +140,41 @@ bind_key(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id)
     memcpy(&payload[8], key.id, 3);
     int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
     return n;
+}
+#define INVALID_HEX_CHAR 0x10
+char
+parse_hex_char(char h) {
+    if(h >= '0' && h <= '9') {
+        return h - '0';
+    }
+    if(h >= 'a' && h <= 'f') {
+        return h - 'a' + 10;
+    }
+    if(h >= 'A' && h <= 'F') {
+        return h - 'A' + 10;
+    }
+    return INVALID_HEX_CHAR;
+}
+#define INVALID_COLOR 0xFF000000
+uint32_t 
+parse_hex_color(const char *str) {
+    int len = strlen(str);
+    if(len != 6) {
+        return INVALID_COLOR;
+    }
+    uint32_t res = 0;
+    int shift = 16;
+    for(int i = 0; i < 3; i++) {
+        char high   = parse_hex_char(str[i * 2]);
+        char low    = parse_hex_char(str[i * 2 + 1]);
+        if(high == INVALID_HEX_CHAR || low == INVALID_HEX_CHAR) {
+            return INVALID_COLOR;
+        }
+        char b = ((high & 0xF) << 4) | (low & 0xF);
+        res |= (b & 0xFF) << shift;
+        shift -= 8;
+    }    
+    return res;
 }
 int
 set(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
@@ -170,6 +224,23 @@ set(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
             eprintf("Power down time must be a number from 3 to 10\n");
             return -1;
         }
+    }
+    else if(strcmp("dpi-colors", argv[0]) == 0) {
+        if(argc == 6) {
+            uint32_t colors[5];         
+            for(int i = 0; i < 5; i++) {
+                colors[i] = parse_hex_color(argv[1 + i]);
+                if(colors[i] == INVALID_COLOR) {
+                    eprintf("Invalid color\n");
+                    return -1;
+                }
+            }
+            return set_dpi_colors(dev_handle, packet_id, colors);
+        } else {
+            eprintf("Expected 5 colors\n");
+            return -1;
+        }
+        return 0;
     } else {
         eprintf("Unknown\n");
         return -1;
