@@ -114,5 +114,9 @@
     {
         "name": "Media/Calculator",
         "id": "0x80, 0x92, 0x01"
+    },
+    {
+        "name": "Disable",
+        "id": "0x00, 0x00, 0x00"
     }
 ]
