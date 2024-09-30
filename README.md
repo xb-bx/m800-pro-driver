@@ -4,8 +4,9 @@
     - [X] set current polling rate
     - [X] Remap keys
     - [ ] Set DPI
-    - [ ] Set LOD height
-    - [ ] Set Debounce time
+    - [X] Set LOD height
+    - [X] Set Debounce time
+    - [X] Set Powerdown time
 # Requirements
     - C compiler
     - jq

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include "buttons.h"
 #include "keys.h"
 #define M800_PRO_VID 0x248a
@@ -20,11 +21,14 @@ void
 usage() {
     printf("m800pro-drv <command> <args>\n");
     printf("commands:\n");
-    printf("    list-keys                                   -   list keys\n");
-    printf("    list-buttons                                -   list buttons\n");
-    printf("    charge                                      -   query battery charge\n");
-    printf("    set         poll (125|250|500|1000)         -   set polling rate\n");
-    printf("    bind        <btn> <key>                     -   bind btn to key\n");
+    printf("\tlist-keys\n");
+    printf("\tlist-buttons\n");
+    printf("\tcharge\n");
+    printf("\tset\tpoll\t\t(125/250/500/1000)\n");
+    printf("\tset\tpowerdown-time\t3-10\n");
+    printf("\tset\tdebounce-time\t0-30\n");
+    printf("\tset\tLOD\t(1/2)\n");
+    printf("\tbind\t<btn>\t<key>\t\n");
 }
 int
 query(int argc, char **argv, libusb_device_handle *dev_handle, int charge, int packet_id) {
@@ -48,6 +52,30 @@ set_polling_rate(libusb_device_handle *dev_handle, int packet_id, int polling_ra
     unsigned char payload[33] = {0xc, 0x1, 0x7, 0x0, 0x32, 0x1, 0x1, 0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     payload[4] = packet_id + 1;
     payload[7] = polling_rate;
+    int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
+    return n;
+}
+int
+set_debounce_time(libusb_device_handle *dev_handle, int packet_id, int debounce_time) {
+    unsigned char payload[33] = {0xc, 0x1, 0xa, 0x0, 0xd, 0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    payload[4] = packet_id + 1;
+    payload[7] = debounce_time;
+    int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
+    return n;
+}
+int
+set_powerdown_time(libusb_device_handle *dev_handle, int packet_id, int powerdown_time) {
+    unsigned char payload[33] = {0xc, 0x1, 0xb, 0x0, 0x2, 0x1, 0x2, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    payload[4] = packet_id + 1;
+    payload[7] = powerdown_time;
+    int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
+    return n;
+}
+int
+set_LOD(libusb_device_handle *dev_handle, int packet_id, int lod) {
+    unsigned char payload[33] = {0xc, 0x1, 0x9, 0x0, 0xb, 0x1, 0x2, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    payload[4] = packet_id + 1;
+    payload[7] = lod;
     int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
     return n;
 }
@@ -115,6 +143,33 @@ set(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
             return -1;
         }
         return set_polling_rate(dev_handle, packet_id, polling_rate);
+    }
+    else if(strcmp("LOD", argv[0]) == 0) {
+        int LOD = atoi(argv[1]);
+        if(LOD == 1 || LOD == 2) {
+            return set_LOD(dev_handle, packet_id, LOD);
+        } else {
+            eprintf("LOD must be either 1 or 2\n");
+            return -1;
+        }
+    }
+    else if(strcmp("debounce-time", argv[0]) == 0) {
+        int debounce_time = atoi(argv[1]);
+        if(debounce_time >= 0 && debounce_time <= 30) {
+            return set_debounce_time(dev_handle, packet_id, debounce_time);
+        } else {
+            eprintf("Power down time must be a number from 3 to 10\n");
+            return -1;
+        }
+    }
+    else if(strcmp("powerdown-time", argv[0]) == 0) {
+        int powerdown_time = atoi(argv[1]);
+        if(powerdown_time >= 3 && powerdown_time <= 10) {
+            return set_powerdown_time(dev_handle, packet_id, powerdown_time);
+        } else {
+            eprintf("Power down time must be a number from 3 to 10\n");
+            return -1;
+        }
     } else {
         eprintf("Unknown\n");
         return -1;
