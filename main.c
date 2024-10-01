@@ -28,7 +28,8 @@ usage() {
     printf("\tset\tpowerdown-time\t3-10\n");
     printf("\tset\tdebounce-time\t0-30\n");
     printf("\tset\tdpi-colors\tff00ff 00ff00 ffffff ff0000 0000ff\n");
-    printf("\tset\tLOD\t\t(1/2)\n");
+    printf("\tset\tLOD\t\t1/2\n");
+    printf("\tset\tmotion-wakeup\ton/off\n");
     printf("\tbind\t<btn>\t\t<key>\t\n");
 }
 int
@@ -77,6 +78,14 @@ set_LOD(libusb_device_handle *dev_handle, int packet_id, int lod) {
     unsigned char payload[33] = {0xc, 0x1, 0x9, 0x0, 0xb, 0x1, 0x2, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     payload[4] = packet_id + 1;
     payload[7] = lod;
+    int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
+    return n;
+}
+int
+set_motion_wakeup(libusb_device_handle *dev_handle, int packet_id, int enable) {
+    unsigned char payload[33] = {0xc, 0x1, 0xc, 0x0, 0x0, 0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    payload[4] = packet_id + 1;
+    payload[7] = enable;
     int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
     return n;
 }
@@ -224,6 +233,18 @@ set(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
             eprintf("Power down time must be a number from 3 to 10\n");
             return -1;
         }
+    }
+    else if(strcmp("motion-wakeup", argv[0]) == 0) {
+        int enable = 0;
+        if(strcmp(argv[1], "on") == 0) {
+            enable = 1;
+        } else if(strcmp(argv[1], "off") == 0) {
+            enable = 0;
+        } else {
+            eprintf("Expected 'on' or 'off'\n");
+            return -1;
+        }
+        set_motion_wakeup(dev_handle, packet_id, enable);
     }
     else if(strcmp("dpi-colors", argv[0]) == 0) {
         if(argc == 6) {

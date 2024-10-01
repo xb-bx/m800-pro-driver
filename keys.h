@@ -33,5 +33,6 @@ Key keys[] = {
     {.name = "Media/Mail", 			.id = {0x80, 0x8a, 0x01}},
     {.name = "Media/Calculator", 	.id = {0x80, 0x92, 0x01}},
     {.name = "Disable", 			.id = {0x00, 0x00, 0x00}},
+    {.name = "TrippleClick", 		.id = {0x30, 0x32, 0x03}},
 };
 #define KEYS_COUNT sizeof(keys) / sizeof(Key)
