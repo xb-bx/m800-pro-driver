@@ -3,14 +3,15 @@
     - [X] Get battery charge
     - [X] set current polling rate
     - [X] Remap keys
-    - [ ] Set DPI
+    - [X] Set DPI
     - [X] Set DPI colors
     - [X] Set LOD height
     - [X] Set Debounce time
     - [X] Set Powerdown time
+    - [X] Turn on/off motion wakeup
+    - [ ] Macros
 # Requirements
     - C compiler
-    - jq
     - make
     - libusb
 

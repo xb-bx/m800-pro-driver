@@ -27,27 +27,11 @@ usage() {
     printf("\tset\tpoll\t\t(125/250/500/1000)\n");
     printf("\tset\tpowerdown-time\t3-10\n");
     printf("\tset\tdebounce-time\t0-30\n");
+    printf("\tset\tdpi\t\t0-26000 0-26000 0-26000 0-26000 0-26000\n");
     printf("\tset\tdpi-colors\tff00ff 00ff00 ffffff ff0000 0000ff\n");
     printf("\tset\tLOD\t\t1/2\n");
     printf("\tset\tmotion-wakeup\ton/off\n");
     printf("\tbind\t<btn>\t\t<key>\t\n");
-}
-int
-query(int argc, char **argv, libusb_device_handle *dev_handle, int charge, int packet_id) {
-    if(argc == 0) {
-        usage(); 
-        return -1;
-    }
-    if(strcmp("charge", argv[0]) == 0) {
-        printf("%i\n", charge);
-        return 0;
-    } else if(strcmp("poll", argv[0]) == 0) {
-        eprintf("NOT IMPLEMENTED\n");
-        return -1;
-    } else {
-        eprintf("Unknown\n");
-        return -1;
-    }
 }
 int
 set_polling_rate(libusb_device_handle *dev_handle, int packet_id, int polling_rate) {
@@ -94,6 +78,40 @@ set_color(unsigned char *at, uint32_t color) {
     at[0] = (color >> 16) & 0xFF;
     at[1] = (color >>  8) & 0xFF;
     at[2] = (color >>  0) & 0xFF;
+}
+int
+set_dpi(libusb_device_handle *dev_handle, int packet_id, int dpi[5]) {
+    unsigned char payload[33]   = {0xc, 0x1, 0x5, 0x0, 0x0, 0x1, 0x12, 0x10, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, };
+    unsigned char sum_enabled   = 0;
+    unsigned char bitmask       = 0;
+    
+    int shift = 0;
+    for(int i = 0; i < 5; i++) {
+        if(dpi[i] > 0) {
+            sum_enabled++;
+            bitmask |= 1 << shift;
+        }
+        shift++;
+    }
+
+    payload[4]  = packet_id + 1;
+    payload[7] += sum_enabled; 
+    payload[8]  = bitmask;
+    for(int i = 0; i < 5; i++) {
+        int payloadi = 9 + i * 2;
+        if(dpi[i] == 0) {
+            payload[payloadi]       = 0;
+            payload[payloadi + 1]   = 0;
+        } else {
+            // DPI is represented by 16 bit little-endian number * 50 + 50
+            int dpival  = dpi[i] / 50 - 1;
+
+            payload[payloadi]       = dpival & 0xFF;
+            payload[payloadi + 1]   = (dpival >> 8) & 0xFF;
+        }
+    }
+    int n = libusb_control_transfer(dev_handle, 0x21, 0x9, 0x30c, 1, payload, 33, 0);
+    return 0;
 }
 int
 set_dpi_colors(libusb_device_handle *dev_handle, int packet_id, uint32_t colors[5]) {
@@ -246,6 +264,24 @@ set(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
         }
         set_motion_wakeup(dev_handle, packet_id, enable);
     }
+    else if(strcmp("dpi", argv[0]) == 0) {
+        if(argc == 6) {
+            int dpi[5];         
+            char *end = NULL;
+            for(int i = 0; i < 5; i++) {
+                dpi[i] = strtol(argv[1+i], &end, 10);
+                if(end[0] != '\0' || dpi[i] < 0 || dpi[i] > 26000 || dpi[i] % 50 != 0) {
+                    eprintf("DPI must be from 0 to 26000 and be divisible by 50\n");
+                    return -1;
+                }
+            }
+            return set_dpi(dev_handle, packet_id, dpi);
+        } else {
+            eprintf("Expected 5 values\n");
+            return -1;
+        }
+        return 0;
+    }
     else if(strcmp("dpi-colors", argv[0]) == 0) {
         if(argc == 6) {
             uint32_t colors[5];         
@@ -358,6 +394,8 @@ main(int argc, char **argv) {
             Key key = keys[i];
             printf("%s\n", key.name); 
         }
+    } else {
+        usage();
     }
 
     if (res < 0) {
