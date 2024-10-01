@@ -28,8 +28,8 @@ usage() {
     printf("\tset\tpowerdown-time\t3-10\n");
     printf("\tset\tdebounce-time\t0-30\n");
     printf("\tset\tdpi-colors\tff00ff 00ff00 ffffff ff0000 0000ff\n");
-    printf("\tset\tLOD\t(1/2)\n");
-    printf("\tbind\t<btn>\t<key>\t\n");
+    printf("\tset\tLOD\t\t(1/2)\n");
+    printf("\tbind\t<btn>\t\t<key>\t\n");
 }
 int
 query(int argc, char **argv, libusb_device_handle *dev_handle, int charge, int packet_id) {
