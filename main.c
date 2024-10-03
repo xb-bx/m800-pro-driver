@@ -3,10 +3,12 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "buttons.h"
 #include "keys.h"
 #define M800_PRO_VID 0x248a
 #define M800_PRO_PID 0x5b2f
+#define M800_PRO_WIRED_PID 0x5b2e
 #define INTERFACE 1
 #define eprintf(args...) fprintf(stderr, args)
 
@@ -262,7 +264,7 @@ set(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
             eprintf("Expected 'on' or 'off'\n");
             return -1;
         }
-        set_motion_wakeup(dev_handle, packet_id, enable);
+        return set_motion_wakeup(dev_handle, packet_id, enable);
     }
     else if(strcmp("dpi", argv[0]) == 0) {
         if(argc == 6) {
@@ -303,7 +305,7 @@ set(int argc, char **argv, libusb_device_handle *dev_handle, int packet_id) {
         return -1;
     }
 }
-
+#define BATTERY_CHARGING 0x65
 int 
 initial_query(libusb_device_handle *dev_handle, int *packet_id) {
     int i = 1;
@@ -321,6 +323,9 @@ initial_query(libusb_device_handle *dev_handle, int *packet_id) {
         }
         if(buf[18]) {
             *packet_id = i - 1;
+            if(buf[19] == 1) {
+                return BATTERY_CHARGING;
+            }
             return buf[18];
         }
     }
@@ -343,7 +348,7 @@ main(int argc, char **argv) {
     for(int i = 0; i < count; i ++) {
         struct libusb_device_descriptor desc;
         libusb_get_device_descriptor(list[i], &desc);
-        if(desc.idVendor == M800_PRO_VID && desc.idProduct == M800_PRO_PID) {
+        if(desc.idVendor == M800_PRO_VID && (desc.idProduct == M800_PRO_PID || desc.idProduct == M800_PRO_WIRED_PID)) {
             needed_device = list[i];
         }
     }
@@ -379,7 +384,11 @@ main(int argc, char **argv) {
     }
     int res = 0;
     if(strcmp("charge", argv[1]) == 0) {
-        printf("%i\n", charge);
+        if(charge == BATTERY_CHARGING) {
+            printf("charging\n");
+        } else {
+            printf("%i%%\n", charge);
+        }
     } else if(strcmp("set", argv[1]) == 0) {
         res = set(argc-2, argv+2, dev_handle, id);
     } else if(strcmp("bind", argv[1]) == 0) {
